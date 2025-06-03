@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Web.Http;
 using BusinessEntities;
@@ -28,7 +29,11 @@ namespace WebApi.Controllers
         [HttpPost]
         public HttpResponseMessage CreateUser(Guid userId, [FromBody] UserModel model)
         {
-            var user = _createUserService.Create(userId, model.Name, model.Email, model.Type, model.AnnualSalary, model.Tags);
+            var user = _getUserService.GetUser(userId);
+            if (user != null)
+                return ControllerContext.Request.CreateResponse(HttpStatusCode.BadRequest, "error: this userId already exists");
+
+            user = _createUserService.Create(userId, model.Name, model.Email, model.Type, model.AnnualSalary, model.Tags);
             return Found(new UserData(user));
         }
 
@@ -41,6 +46,16 @@ namespace WebApi.Controllers
             {
                 return DoesNotExist();
             }
+            if (model.Email == null)
+                model.Email = user.Email;
+            if (model.Name == null)
+                model.Name = user.Name;
+            if (model.AnnualSalary == null)
+                model.AnnualSalary = user.MonthlySalary * 12;
+            if (model.Tags == null)
+                model.Tags = user.Tags;
+
+
             _updateUserService.Update(user, model.Name, model.Email, model.Type, model.AnnualSalary, model.Tags);
             return Found(new UserData(user));
         }
@@ -89,7 +104,12 @@ namespace WebApi.Controllers
         [HttpGet]
         public HttpResponseMessage GetUsersByTag(string tag)
         {
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
+            var users = _getUserService.GetUsers().Where(q => q.Tags.Contains(tag))
+                                       .Select(q => new UserData(q))
+                                       .ToList();
+            return Found(users);
+
         }
     }
 }
